@@ -93,3 +93,112 @@ dsquery user "ou=Grupos,ou=Clase,ou=DA,dc=Medac,dc=com" > C:\infoGrupos.txt
 :: Para eliminar la Unidad Organizativa Clase y todo lo que hay dentro (-subtree borra lo que hay dentro -noprompt hace que no pida confirmación y -c confirma eso)
 
 dsrm -subtree -noprompt -c "ou=Clase,ou=DA,dc=Medac,dc=com"
+
+:: //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+:: ADICIONAL
+:: //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+
+:: Indicar obtener los equipos que comiencen por “(iniciales)” dentro del dominio.
+dsquery computer "ou=Clase,ou=DA,cd=Medac,cd=com" -Name *DA*
+
+:: Obtener las unidades organizativas que terminen por “clase”  dentro del dominio.
+dsquery ou "ou=Clase,ou=DA,cd=Medac,cd=com" -Name *clase
+
+:: Obtener las cuentas de usuario que estén deshabilitadas dentro del dominio.
+dsquery user "ou=Usuarios,ou=Clase,ou=DA,dc=Medac,dc=com" -disabled
+
+:: Modificar la descripción del grupo izquierda
+dsmod group "cn=Izquierda,ou=Clase,ou=DA,dc=Medac,dc=com" -desc "Grupo de la izquierda"
+
+:: Modificar la descripción del grupo derecha
+dsmod group "cn=derecha,ou=Clase,ou=DA,dc=Medac,dc=com" -desc "Grupo de la derecha"
+
+:: Modificar la descripción del grupo centro
+dsmod group "cn=centro,ou=Clase,ou=DA,dc=Medac,dc=com" -desc "Grupo del centro"
+
+:: Cambiar la propiedad userAccountControl para permitir que los usuarios cambien su contraseña
+dsquery user "ou=Clase,ou=DA,DC=Medac,DC=com" | dsmod user -mustchpwd yes
+
+:: Definir las variables
+set OU=Clase
+set EXPIRATION_DATE=20240601
+set WEB_PAGE=www.google.es
+set TITLE=clase
+set DEPARTMENT=Redes
+set PASSWORD=Curso@Red07
+
+:: Obtener la lista de usuarios en la Unidad Organizativa
+for /f "tokens=*" %%A in ('dsquery user "ou=%OU%,ou=DA,dc=Medac,dc=com"') do (
+    dsmod user %%A -acctexpires %EXPIRATION_DATE%
+    dsmod user %%A -webpg %WEB_PAGE%
+    dsmod user %%A -title %TITLE%
+    dsmod user %%A -dept %DEPARTMENT%
+    dsmod user %%A -pwd %PASSWORD% -mustchpwd yes
+)
+
+:: Obtener el upn de todos los usuarios del grupo izquierda
+dsget group "cn=Izquierda,ou=grupos,ou=clase,ou=DA,dc=Medac,dc=com" -members | dsget user -upn > MiembrosIzquierda.txt
+
+:: Agregar usuarios a grupo de administradores
+dsadd group "cn=Administradores,ou=Grupos,ou=Clase,ou=DA,dc=Medac,dc=com"
+
+for /f "tokens=*" %%a in ('dsquery group "%Usuarios%" ^| dsget group -members -expand') do (
+    set "usuarioDN=%%a"
+    
+     Mover el usuario al grupo destino
+    dsmod group "%Administradores%" -addmbr "!usuarioDN!"
+    
+    echo "Usuario movido al grupo de administradores: !usuarioDN!"
+)
+
+:: Obtener el upn y los días que faltan para que caduquen las cuentas  de la unidad organizativa clase. 
+for /f "tokens=* usebackq" %%a in (`dsquery user "%unidadOrganizativa%" -limit 0`) do (
+    set "usuarioDN=%%a"
+    set "upn="
+    set "cuentaCaduca="
+
+    :: Obtener el UPN y la información sobre si la cuenta caduca
+    for /f "tokens=*" %%b in ('dsget user !usuarioDN! -upn -acctexpires') do (
+        set "line=%%b"
+        for /f "tokens=1,2" %%c in ("!line!") do (
+            set "upn=%%c"
+            set "cuentaCaduca=%%d"
+        )
+    )
+
+    :: Mostrar el resultado
+    echo UPN: !upn!
+    if "!cuentaCaduca!" neq "never" (
+        echo La cuenta caduca.
+    ) else (
+        echo La cuenta no caduca.
+    )
+    echo.
+)
+
+:: Crea un usuario que se llame “nuevoalumno” con tus iniciales delante en el contenedor USERS del dominio.
+dsadd user "cn=NuevoAlumnoDA,ou=Clase,ou=DA,dc=Medac,dc=com"
+
+:: Mueve el usuario anterior a la unidad organizativa usuarios ubicada dentro de clase.
+dsmod group "cn=Usuarios,ou=Grupos,ou=Clase,ou=DA,dc=Medac,dc=com" -addmbr "cn=NuevoAlumnoDA,ou=Clase,ou=DA,dc=Medac,dc=com"
+
+:: Pasar a un archivo de texto el nombre de los grupos ubicados dentro de la unidad organizativa grupos y los usuarios pertenecientes a cada uno de ellos. 
+REM Definir el archivo de salida
+set archivoSalida=grupos_y_usuarios.txt
+
+    ::Obtener los grupos de la unidad organizativa "Grupos"
+    for /f "tokens=* usebackq" %%a in (`dsquery group "%unidadOrganizativa%" -limit 0`) do (
+        set "grupoDN=%%a"
+        set "usuarios="
+
+    :: Obtener los usuarios del grupo
+    for /f "tokens=* usebackq" %%b in ('dsget group !grupoDN! -members -expand') do (
+        set "usuarios=!usuarios! %%b"
+    )
+
+    :: Escribir en el archivo de salida
+    echo Grupo: !grupoDN! >> %archivoSalida%
+    echo Usuarios: !usuarios! >> %archivoSalida%
+    echo. >> %archivoSalida%
+)
