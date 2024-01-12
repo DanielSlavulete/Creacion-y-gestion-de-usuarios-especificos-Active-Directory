@@ -92,7 +92,9 @@ dsquery user "ou=Grupos,ou=Clase,ou=DA,dc=Medac,dc=com" > C:\infoGrupos.txt
 
 :: Para eliminar la Unidad Organizativa Clase y todo lo que hay dentro (-subtree borra lo que hay dentro -noprompt hace que no pida confirmación y -c confirma eso)
 
-dsrm -subtree -noprompt -c "ou=Clase,ou=DA,dc=Medac,dc=com"
+:: Quitar :: para ejecutar el comando de abajo
+
+:: dsrm -subtree -noprompt -c "ou=Clase,ou=DA,dc=Medac,dc=com"
 
 :: //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 :: ADICIONAL
